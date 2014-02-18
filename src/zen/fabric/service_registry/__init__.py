@@ -1,0 +1,2 @@
+
+PATH='/service_registry'
