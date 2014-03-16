@@ -1,7 +1,10 @@
+import json
+import socket as sys_socket
 import traceback
 import zmq
 
 from zen.fabric.service_endpoint import ServiceEndpoint
+from zen.fabric.json_util import filter_json
 
 class ServiceContainer(ServiceEndpoint):
     ''' Service Container
@@ -14,7 +17,7 @@ class ServiceContainer(ServiceEndpoint):
         self._services = {}
         self._is_running = False
 
-    def init(self, request_address='*', request_port=None, ):
+    def init(self, request_address='*', request_port=None, srap=None):
         ''' Initialize the container with the specified request port
         
             Params
@@ -25,65 +28,65 @@ class ServiceContainer(ServiceEndpoint):
 
             request_port : int, optional
                 Port to which the request socket should be bound
+            srap : string, optional
+                String of address:port where the service registry is located
         '''
-        socket = self._socket(zmq.REP, self._handle_request)
+        socket = self.socket(zmq.REP, self._handle_request)
         if request_port:
             socket.bind('tcp://{0}:{1}'.format(request_address, request_port))
             self._request_port = request_port
         else:
-            self._request_port = socket.bind_to_random_port(
-                    'tcp://{0}'.format(request_address)
-                )
+            bind_address = 'tcp://{0}'.format(request_address)
+            print('Binding to {0}'.format(bind_address))
+            self._request_port = socket.bind_to_random_port(bind_address)                 
+        
+        if request_address == '*':
+            self._request_address = 'localhost' #sys_socket.getfqdn()
+        else:
+            self._request_address = request_address
+        super(ServiceContainer, self).init(srap)
+        print('Service container ready on port {0}'.format(self._request_port))
 
-    def register_service(self, service, path):
+    def register_service(self, service, path, localOnly=False):
         ''' Register a local service with this service registery
+        
+        Params
+        ======
+        localOnly : boolean
+            True if this service should not be registered with the remote service
+            registry.
         '''
         self._services[path] = service
         service._container = self
+        if localOnly:
+            return
+        # Register with the remote service registry
+        self._service_registry.register_service(path, self._request_address, self._request_port)
 
-    def run(self, pacing=1000):
-        ''' Run the service container in the current thread.
-
-            Params
-            =====
-            pacing : int
-                timeout in milliseconds for each poll; this is the finest 
-                granularity of timeouts and other timed events.
-        '''
-        # Indicate that the container is running
-        self._is_running = True
-        
-        # Loop until something has indicated that the container is no longer 
-        # running
-        while self._is_running:
-            try:
-                self._poll_once(pacing)
-            except KeyboardInterrupt as e:
-                print('Shutting down via keyboard interrupt...')
-                self.shutdown()
-            except:
-                #TODO Handle errors instead of simply ignoring them.
-                print('Got an exception:{0}'.format(traceback.format_exc()))
-                continue
-
-    def shutdown(self):
-        self._is_running = False
-        #TODO Anything else need to be done?
+    def _get_service(self, path):
+        if path in self._services:
+            return self._services[path]
+        else:
+            return None
 
     def _handle_request(self, socket):
         ''' Handler for the request port.  This handles inbound request 
             messages.
         '''
+        print('in _handle_request')
         msg_id, request_string = socket.recv_multipart()
+        print('REQ: {0}'.format(request_string))
         request = filter_json(json.loads(request_string))
         if 'path' not in request:
             #TODO Log error; requests without a path cannot be handled
+            print('Error, no path specified.')
             return
-        
+
         service = self._get_service(request['path'])
         if not service:
             #TODO Log an error, or check to see if  the service exists in a 
             # federated registry or gateway
+            print('Error, service path not specified')
             return
 
         response = service.handle_request(msg_id, request)
@@ -91,4 +94,6 @@ class ServiceContainer(ServiceEndpoint):
         if response is None:
             response = {}
 
-        socket.send_multipart([msg_id, json.dumps(response)])
+        response_string = json.dumps(response)
+        print('REP: {0}'.format(response_string))
+        socket.send_multipart([msg_id, response_string])

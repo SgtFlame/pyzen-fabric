@@ -31,8 +31,8 @@ class TaskSchedule():
             task - must be an object with "callback" as a function;
                 e.g. twisted Deferred
         '''
-        i = bisect_right(time, self._taskTimes)
-        self._taskTimes.insert(i, time)
+        i = bisect_right(self._task_times, time)
+        self._task_times.insert(i, time)
         self._tasks.insert(i, task)
         return i
     
@@ -40,5 +40,6 @@ class TaskSchedule():
         ''' Executes all of the tasks that need to be executed.
         '''
         while self._task_times and self._task_times[0] <= datetime.now():
-            self._tasks.pop(0).callback()
-            self._task_times(0)
+            deferred = self._tasks.pop(0)
+            deferred.callback(None)
+            self._task_times.pop(0)
