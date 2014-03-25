@@ -13,8 +13,11 @@ class ServiceEndpoint(object):
     
         An end-point for services and service clients.
     '''
-    def __init__(self):
-        self._context = zmq.Context()
+    def __init__(self, context=None):
+        if context:
+            self._context = context
+        else:
+            self._context = zmq.Context()
         self._poll = zmq.Poller()
         self._task_schedule = TaskSchedule()
         self._service_registry = None
@@ -191,7 +194,12 @@ class ServiceEndpoint(object):
         if msg_id not in self._requests:
             print('msg_id {0} not in requests'.format(msg_id))
             return
-        
+
         print('RCV: {0}'.format(reply_str))
         reply = filter_json(reply_str)
         self._requests.pop(msg_id).callback(reply)
+
+    def call_later(self, seconds, task):
+        deferred = defer.Deferred()
+        deferred.addCallback(task)
+        self._task_schedule.queue_relative_task(seconds, deferred)

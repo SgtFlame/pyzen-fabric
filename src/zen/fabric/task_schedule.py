@@ -16,8 +16,13 @@ class TaskSchedule():
     def queue_relative_task(self, seconds, task):
         ''' Queue a task to be executed in the specified number of 
             seconds.
-            
-            task - must be an object with "callback" as a function;
+        
+        Parameters
+        ----------
+        seconds : int
+            Number of seconds to wait before this task is executed
+        task    : defer.Deferred
+            must be an object with "callback" as a function;
                 e.g. twisted Deferred
         '''
         k = datetime.now() + timedelta(seconds=seconds)
