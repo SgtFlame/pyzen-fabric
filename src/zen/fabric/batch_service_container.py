@@ -6,4 +6,3 @@ class BatchServiceContainer(ServiceContainer):
         Service container for batch / head-less processes
     '''
     pass
-

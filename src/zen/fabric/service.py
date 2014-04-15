@@ -1,17 +1,27 @@
 ''' service.py
 
-    Server side service
-    
-    Extend this class to create a service.
+Server side service
+
+Extend this class to create a service.
 '''
+
+import traceback
 
 class Service(object):
     
-    def __init__(self):
-        # Initialize the service container that contains this service as None
-        # This will be populated with the correct value when the service
-        # is registered with container.register_service(service)
-        self._container = None
+    def __init__(self, container=None):
+        ''' Initialize the service container that contains this service as None
+        This will be populated with the correct value when the service
+        is registered with container.register_service(service)
+        (unless, of course, the container is specified here)
+        
+        Params
+        ------
+        container - ServiceContainer
+            Generally a ServiceContainer, but could be a ServiceEndpoint
+            or something derived from either
+        '''
+        self._container = container
 
     def handle_request(self, client_id, request):
         ''' Handle a request message

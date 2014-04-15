@@ -40,7 +40,7 @@ class TaskSchedule():
         self._task_times.insert(i, time)
         self._tasks.insert(i, task)
         return i
-    
+
     def execute(self):
         ''' Executes all of the tasks that need to be executed.
         '''

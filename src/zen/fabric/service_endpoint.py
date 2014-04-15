@@ -11,7 +11,7 @@ from zen.fabric.json_util import filter_json
 class ServiceEndpoint(object):
     ''' Service End-point
     
-        An end-point for services and service clients.
+    An Enterprise Service Bus end-point for services and service clients.
     '''
     def __init__(self, context=None):
         if context:
@@ -29,10 +29,10 @@ class ServiceEndpoint(object):
     def init(self, srap):
         ''' Initialize the service endpoint
         
-            Params
-            ======
-            srap : string, optional
-                String of address:port where the service registry is located
+        Params
+        ------
+        srap : string, optional
+            String of address:port where the service registry is located
         '''
         if self._service_registry is not None:
             #TODO Log
@@ -44,11 +44,11 @@ class ServiceEndpoint(object):
     def run(self, pacing=1000):
         ''' Run the service container in the current thread.
 
-            Params
-            =====
-            pacing : int
-                timeout in milliseconds for each poll; this is the finest 
-                granularity of timeouts and other timed events.
+        Params
+        ------
+        pacing : int
+            timeout in milliseconds for each poll; this is the finest 
+            granularity of timeouts and other timed events.
         '''
         # Indicate that the container is running
         self._is_running = True
@@ -75,20 +75,20 @@ class ServiceEndpoint(object):
 
     def send_request(self, request):
         ''' Send a request. This assumes the request has a path, and it uses
-            the service registry to determine which socket can handle the
-            request based on the service registry.
+        the service registry to determine which socket can handle the request 
+        based on the service registry.
         
-            Params
-            ======
-            request : dictionary
-                Standard request message that contains a path, command, and
-                args entries.
+        Params
+        ------
+        request : dictionary
+            Standard request message that contains a path, command, and
+            args entries.
 
-            Returns
-            =======
-            reply_received : defer.Deferred
-                Deferred object that is fired when the reply to the request
-                has been received.
+        Returns
+        -------
+        reply_received : defer.Deferred
+            Deferred object that is fired when the reply to the request
+            has been received.
         '''
         if 'path' not in request:
             raise RuntimeError('Cannot send request without a path')
@@ -114,32 +114,34 @@ class ServiceEndpoint(object):
     def connect_request(self, address):
         ''' Connect to the specified address for sending request messages.
         
-            Params
-            ======
-            address : string
-                address:port
+        Params
+        ------
+        address : string
+            address:port
         '''
         socket = self.socket(zmq.REQ, self._handle_response)
-        socket.connect('tcp://{0}'.format(address))
+        connect_string = 'tcp://{0}'.format(address)
+        print('ServiceEndpoint.connect_request: Connecting to {0}'.format(connect_string))
+        socket.connect(connect_string)
         return socket
 
     def send_message_to_socket(self, socket, message, msg_id=None):
         ''' Send a request to the specified socket.  
             
-            Params
-            ======
-            socket : zmq.Socket
-                Socket through which the message will be sent
-            message : string
-                Message to be sent
-            msg_id : string
-                Unique message identifier
-                
-            Returns
-            =======
-            msg_id : string
-                Message id of the message sent, which will be part of the
-                reply if there is one.
+        Params
+        ------
+        socket : zmq.Socket
+            Socket through which the message will be sent
+        message : string
+            Message to be sent
+        msg_id : string
+            Unique message identifier
+            
+        Returns
+        -------
+        msg_id : string
+            Message id of the message sent, which will be part of the reply if
+            there is one.
         '''
         print('Sending to {0}'.format(socket))
         if msg_id is None:
@@ -152,21 +154,20 @@ class ServiceEndpoint(object):
 
     def socket(self, socketType, handler):
         ''' Construct a server socket and register it for input polling as well
-            as register a handler to call when the socket receives request
-            messages.
+        as register a handler to call when the socket receives request messages.
 
-            Params
-            ======
-            socketType : int
-                zmq socket type (zmq.REP is the normal socket type)
-            handler : function
-                Function that will handle any inbound requests.  The function
-                should take on parameter, which is the zmq socket on which
-                the request is being received.
-            Returns
-            =======
-            socket : zmq socket
-                zmq socket that was constructed.
+        Params
+        ------
+        socketType : int
+            zmq socket type (zmq.REP is the normal socket type)
+        handler : function
+            Function that will handle any inbound requests.  The function
+            should take on parameter, which is the zmq socket on which
+            the request is being received.
+        Returns
+        -------
+        socket : zmq socket
+            zmq socket that was constructed.
         '''
         socket = self._context.socket(socketType)
         self._sockets[socket] = handler
@@ -196,10 +197,19 @@ class ServiceEndpoint(object):
             return
 
         print('RCV: {0}'.format(reply_str))
-        reply = filter_json(reply_str)
+        reply = filter_json(json.loads(reply_str))
         self._requests.pop(msg_id).callback(reply)
 
     def call_later(self, seconds, task):
+        ''' Queue a task to be executed after the specified number of seconds have elapsed.
+        
+        Params
+        ------
+        seconds : integer
+            Number of seconds to wait before executing the task
+        task : function
+            Function that is to be called to perform the task
+        '''
         deferred = defer.Deferred()
         deferred.addCallback(task)
         self._task_schedule.queue_relative_task(seconds, deferred)

@@ -8,14 +8,15 @@ from zen.fabric.json_util import filter_json
 
 class ServiceContainer(ServiceEndpoint):
     ''' Service Container
-    
+
         Container for services.
     '''
-    def __init__(self):
+    def __init__(self, json_default=None):
         super(ServiceContainer, self).__init__()
         self._request_port = None
         self._services = {}
         self._is_running = False
+        self._json_default = json_default
 
     def init(self, request_address='*', request_port=None, srap=None):
         ''' Initialize the container with the specified request port
@@ -41,7 +42,7 @@ class ServiceContainer(ServiceEndpoint):
             self._request_port = socket.bind_to_random_port(bind_address)                 
         
         if request_address == '*':
-            self._request_address = 'localhost' #sys_socket.getfqdn()
+            self._request_address = sys_socket.getfqdn()
         else:
             self._request_address = request_address
         super(ServiceContainer, self).init(srap)
@@ -59,9 +60,10 @@ class ServiceContainer(ServiceEndpoint):
         self._services[path] = service
         service._container = self
         if localOnly:
+            #TODO Return a Deferred with the callback already called?
             return
         # Register with the remote service registry
-        self._service_registry.register_service(path, self._request_address, self._request_port)
+        return self._service_registry.register_service(path, self._request_address, self._request_port)
 
     def _get_service(self, path):
         if path in self._services:
@@ -94,6 +96,6 @@ class ServiceContainer(ServiceEndpoint):
         if response is None:
             response = {}
 
-        response_string = json.dumps(response)
+        response_string = json.dumps(response, default=self._json_default)
         print('REP: {0}'.format(response_string))
         socket.send_multipart([msg_id, response_string])

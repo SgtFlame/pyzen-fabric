@@ -11,12 +11,12 @@ class ServiceRegistryProxy(ServiceProxy):
     def __init__(self, container, srap):
         ''' Initialize the service registry proxy
         
-            Params
-            =====
-            container : ServiceContainer
-                Service Container or Service Endpoint
-            srap : string
-                Service registry address:port.
+        Params
+        ------
+        container : ServiceContainer
+            Service Container or Service Endpoint
+        srap : string
+            Service registry address:port.
         '''
         super(ServiceRegistryProxy, self).__init__(container)
         self._socket = self._container.socket(zmq.REQ, self._handle_response)
@@ -24,15 +24,28 @@ class ServiceRegistryProxy(ServiceProxy):
             #TODO Log
             print('Connecting to service registry {0}'.format(srap))
             self._socket.connect('tcp://{0}'.format(srap))
-        #TODO What was the purpose of address_handler?
-        #self._address_handler = address_handler
-        # { service path : { 'REQ' : service socket, } }
+        # _remote_services : { service path : { 'REQ' : service socket, } }
         self._remote_services = {}
-        # service path : deferred; this has the deferred objects for all pending 
-        # service resolutions
+        # _remote_socket_requests : { service path : deferred }
+        # this has the deferred objects for all pending service resolutions
         self._remote_socket_requests = {}
+        # Deferred for pending registrations indexed by msg_id
+        self._pending_registrations = {}
     
     def register_service(self, path, address, port):
+        ''' Register a service with the service registry
+        
+        Params
+        ------
+        path - string
+            Path to the service; the service registry uniquely identifies 
+            services through the use of this path.
+        address - string
+            Address where the service is located, generally the fully qualified
+            domain name of the machine on which this process is running
+        port - string or integer
+            Port where the service is located
+        '''
         new_request = {
             'path': service_registry.PATH,
             'command': 'put', 
@@ -40,18 +53,26 @@ class ServiceRegistryProxy(ServiceProxy):
                             'addresses': { 'REQ': '{0}:{1}'.format(address, port), },
                          }
         }
-        # Should this be 
-        self._container.send_message_to_socket(self._socket, new_request)
+        # Register with the service registry
+        msg_id = self._container.send_message_to_socket(self._socket, new_request)
+        deferred = defer.Deferred()
+        self._pending_registrations[msg_id] = deferred
+        return deferred
 
     def get_remote_socket(self, request):
         ''' Gets the socket that is connected to the server that can handle 
-            the specified request.
+        the specified request.
 
-            Returns
-            =======
-            got_remote_service : defer.Deferred
-                This is an asynchronous call, so it returns a Deferred object
-                that will signal when the socket is known.
+        Params
+        ------
+        request : dictionary
+            Standard request dictionary with command, path, args entries.
+
+        Returns
+        -------
+        got_remote_service : defer.Deferred
+            This is an asynchronous call, so it returns a Deferred object
+            that will signal when the socket is known.
         '''
         path = request['path']
 
@@ -80,14 +101,16 @@ class ServiceRegistryProxy(ServiceProxy):
             return got_remote_socket
 
     def _handle_response(self, socket):
-        _, reply_str = socket.recv_multipart()
+        msg_id, reply_str = socket.recv_multipart()
         #TODO I don't like this decoding here; maybe the decoding should be in 
         # the container?
         print('RCV: {0}'.format(reply_str))
         reply = filter_json(json.loads(reply_str))
 
         if 'path' not in reply:
-            # This is a response from  a put; nothing to do
+            # This is a response from a put
+            if msg_id in self._pending_registrations:
+                self._pending_registrations.pop(msg_id).callback(reply)
             return
 
         service_path = reply['path']
@@ -102,7 +125,8 @@ class ServiceRegistryProxy(ServiceProxy):
         addresses = reply['addresses']
         
         #TODO Handle other connection types
-        socket = self._container.connect_request(addresses['REQ'])
+        connect_string = addresses['REQ']
+        socket = self._container.connect_request(connect_string)
         print('Connected {2} to service {0} at {1}'.format(service_path, addresses['REQ'], socket))
         service = { 'REQ' : socket, }
 
