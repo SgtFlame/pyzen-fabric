@@ -48,6 +48,10 @@ class ServiceContainer(ServiceEndpoint):
         super(ServiceContainer, self).init(srap)
         print('Service container ready on port {0}'.format(self._request_port))
 
+    @property
+    def request_address(self):
+        return self._request_address
+
     def register_service(self, service, path, localOnly=False):
         ''' Register a local service with this service registery
         

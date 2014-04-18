@@ -1,5 +1,6 @@
 import json
 from twisted.internet   import defer
+import uuid
 import zmq
 
 from zen.fabric.service_proxy import ServiceProxy
@@ -54,7 +55,8 @@ class ServiceRegistryProxy(ServiceProxy):
                          }
         }
         # Register with the service registry
-        msg_id = self._container.send_message_to_socket(self._socket, new_request)
+        msg_id = uuid.uuid4().hex
+        self._container.send_message_to_socket(self._socket, new_request, msg_id=msg_id)
         deferred = defer.Deferred()
         self._pending_registrations[msg_id] = deferred
         return deferred

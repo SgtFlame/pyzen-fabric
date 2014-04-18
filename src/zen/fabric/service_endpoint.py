@@ -92,16 +92,16 @@ class ServiceEndpoint(object):
         '''
         if 'path' not in request:
             raise RuntimeError('Cannot send request without a path')
-
+        
         # Create a new Deferred to indicate when the reply to the request has
         # been received
         reply_received = defer.Deferred()
-        
+
         # The reponse will contain the message id, so associate the Deferred with 
         # this message id so it can be activated when the response is returned.
         msg_id = uuid.uuid4().hex
         self._requests[msg_id] = reply_received
-        
+
         # Asyncronously get the remote socket
         got_remote_socket = self._service_registry.get_remote_socket(request)
 
@@ -127,7 +127,7 @@ class ServiceEndpoint(object):
 
     def send_message_to_socket(self, socket, message, msg_id=None):
         ''' Send a request to the specified socket.  
-            
+
         Params
         ------
         socket : zmq.Socket
@@ -139,9 +139,8 @@ class ServiceEndpoint(object):
             
         Returns
         -------
-        msg_id : string
-            Message id of the message sent, which will be part of the reply if
-            there is one.
+        socket : zmq.Socket
+            Returns the socket; used when chaining deferreds
         '''
         print('Sending to {0}'.format(socket))
         if msg_id is None:
@@ -150,7 +149,7 @@ class ServiceEndpoint(object):
         message_str = json.dumps(message)
         print('SND: {0}'.format(message_str))
         socket.send_multipart([msg_id, message_str])
-        return msg_id
+        return socket
 
     def socket(self, socketType, handler):
         ''' Construct a server socket and register it for input polling as well

@@ -4,7 +4,7 @@ Server side service
 
 Extend this class to create a service.
 '''
-
+import json
 import traceback
 
 class Service(object):
@@ -54,3 +54,18 @@ class Service(object):
             self._client_id = None
 
         return response
+
+    def init_notification(self, id):
+        socket = self._container.socket(zmq.PUSH, None)
+        self._notify[id] = socket
+        port = socket.bind_to_random_port('tcp://*')
+        return { 'address' : self._container.request_address, 'port' : port }
+
+    def notify(self, id, message):
+        ''' Send a notification message to a single client '''
+        self._notify[id].send(json.dumps(message))
+
+    def notify_all(self, message):
+        ''' Send a notification message to all clients '''
+        for socket in self._notify.itervalues():
+            socket.send(json.dumps(message))
